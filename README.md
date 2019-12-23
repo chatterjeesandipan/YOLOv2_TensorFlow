@@ -17,7 +17,7 @@ git clone https://github.com/chatterjeesandipan/YOLOv2_TensorFlow.git
 
 Step 3: Install the necessary packages mentioned in the file "requirements.txt"
 ~~~
-pip install -r requirements.txt
+pip install -r ./YOLOv2_TensorFlow/requirements.txt
 ~~~
 
 Step 4: Clone the OIDv4 Toolkit for obtaining training data
@@ -32,6 +32,7 @@ python ./OIDv4_ToolKit/main.py downloader --classes Person Woman Car Truck Tree 
 
 Step 6: Run the training code
 ~~~
+cd ./YOLOv2_TensorFlow
 python YOLOv2_MasterCode.py
 ~~~
 
