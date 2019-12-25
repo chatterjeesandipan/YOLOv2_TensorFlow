@@ -86,9 +86,9 @@ image_bbox_resize_ops(mc, rawdata_dir)
 
 ### Paths of Training and Testing images' and labels' folders
 train_folder = os.path.abspath(os.path.join(mc.maindir, "Dataset", mc.PROJECT, "TRAIN"))
-train_images, train_labels = os.path.join(train_folder, "IMAGES"), os.path.join(train_folder, "LABELS")
+train_images, train_labels = os.path.join(train_folder, "Images"), os.path.join(train_folder, "Labels")
 val_folder = os.path.abspath(os.path.join(mc.maindir, "Dataset", mc.PROJECT, "TEST"))
-val_images, val_labels = os.path.join(val_folder, "IMAGES"), os.path.join(val_folder, "LABELS")
+val_images, val_labels = os.path.join(val_folder, "Images"), os.path.join(val_folder, "Labels")
 
 ### Call Dataset_Utils.py to create a tensorflow dataset of training and validation data
 train_dataset = None
@@ -112,8 +112,8 @@ print("\n=================================================\n")
 aug_train_dataset = augment_dataset(mc, train_dataset)
 
 #### convert data to YOLO format and initiate a training and testing generator
-train_gen = ground_truth_generator(config, aug_train_dataset, labels_dict)
-val_gen = ground_truth_generator(config, val_dataset, labels_dict)
+train_gen = ground_truth_generator(mc, aug_train_dataset, labels_dict)
+val_gen = ground_truth_generator(mc, val_dataset, labels_dict)
 
 #### DEFINE the YOLOv2 model
 class SpaceToDepth(keras.layers.Layer):
