@@ -35,7 +35,7 @@ def train_fn(model, config, train_dataset, val_dataset, train_dir, val_dir, trai
     best_val_loss = 1e6
 
     ## optimizer
-    optimizer = keras.optimizers.Adam(learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
+    optimizer = keras.optimizers.Adam(learning_rate=config.LEARN_RATE, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
     ## Log tensorboard
     summary_writer = tf.summary.create_file_writer(os.path.join(log_dir), flush_millis=5000)
     summary_writer.set_as_default()

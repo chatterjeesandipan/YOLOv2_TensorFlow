@@ -13,10 +13,6 @@ from easydict import EasyDict as edict
 import numpy as np
 import tensorflow as tf
 print("Using Tensorflow version: ", tf.__version__)
-from tensorflow import keras
-from tensorflow.keras.layers import Concatenate, concatenate, Dropout, Dense
-from tensorflow.keras.layers import Reshape, Activation, Flatten
-from tensorflow.keras.layers import Conv2D, Input, MaxPooling2D, BatchNormalization
 
 ### Importing local packages in the folder
 from config import *
@@ -25,6 +21,7 @@ from Dataset_Utils import *
 from Data_Augmentation import *
 from Process_YOLO_format import *
 from Loss_function import *
+from Create_Model import *
 from Train_Function import *
 
 ### Define leakyReLu layer for Convolutions
@@ -67,12 +64,17 @@ parser.add_argument("--loss_coef_class", required=False, default=5, type=int, \
     help='Loss coefficient for detecting the wrong object class in the image')
 parser.add_argument("--loss_coef_coord", required=False, default=5, type=int, \
     help='Loss coefficient for mismatch between predicted and true bounding box coordinates')
+parser.add_argument("--learning_rate", required=False, default=1e-4, type=float, \
+    help='Initial learning rate for model training')
+parser.add_argument("--model", required=False, default="YOLO", type=str, \
+    help='Choose the object detection model type')
 
 args = parser.parse_args()
-mc.PROJECT = args.project_name
+mc.PROJECT, mc.MODEL = args.project_name, args.model.upper()
+assert mc.MODEL in ("VGG", "YOLO")
 mc.IMAGE_W, mc.IMAGE_H = args.image_width, args.image_height
 mc.GRID_W, mc.GRID_H = args.grid_width, args.grid_height
-mc.EPOCHS = args.epochs
+mc.EPOCHS, mc.LEARN_RATE = args.epochs, args.learning_rate
 mc.TRAIN_BATCH_SIZE, mc.VAL_BATCH_SIZE = args.train_batch_size, args.val_batch_size
 mc.LAMBDA_NOOBJECT, mc.LAMBDA_OBJECT = args.loss_coef_noobject, args.loss_coef_object
 mc.LAMBDA_CLASS, mc.LAMBDA_COORD = args.loss_coef_class, args.loss_coef_coord
@@ -115,141 +117,15 @@ aug_train_dataset = augment_dataset(mc, train_dataset)
 train_gen = ground_truth_generator(mc, aug_train_dataset, labels_dict)
 val_gen = ground_truth_generator(mc, val_dataset, labels_dict)
 
-#### DEFINE the YOLOv2 model
-class SpaceToDepth(keras.layers.Layer):
+### Define the object detection model
+if mc.MODEL == "VGG":
+    model = make_VGG_model(mc)
+elif mc.MODEL == "YOLO":
+    model = make_YOLO_model(mc)
+else:
+    raise TypeError("Only VGG and YOLO are valid inputs")
+    sys.exit()
 
-    def __init__(self, block_size, **kwargs):
-        self.block_size = block_size
-        super(SpaceToDepth, self).__init__(**kwargs)
-
-    def call(self, inputs):
-        x = inputs
-        batch, height, width, depth = K.int_shape(x)
-        batch = -1
-        reduced_height = height // self.block_size
-        reduced_width = width // self.block_size
-        y = K.reshape(x, (batch, reduced_height, self.block_size,\
-            reduced_width, self.block_size, depth))
-        z = K.permute_dimensions(y, (0, 1, 3, 2, 4, 5))
-        t = K.reshape(z, (batch, reduced_height, reduced_width, depth*self.block_size**2))
-        return t
-
-    def compute_output_shape(self, input_shape):
-        shape = (input_shape[0], input_shape[1]//self.block_size, input_shape[2]//self.block_size,\
-            input_shape[3]*self.block_size**2)
-        return tf.TensorShape(shape)
-
-def make_model():
-## YOLO v2 MODEL'S Layers
-    input_image = tf.keras.layers.Input((mc.IMAGE_W, mc.IMAGE_H, 3), dtype="float32")
-    ## Layer 1
-    x = Conv2D(32, (3,3), strides=(1,1), padding="same", name="conv_1", use_bias=False)(input_image)
-    x = BatchNormalization(name="norm1")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    x = MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
-    ## Layer 2
-    x = Conv2D(64, (3,3), strides=(1,1), padding="same", name="conv_2", use_bias=False)(x)
-    x = BatchNormalization(name="norm2")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    x = MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
-    ## Layer 3
-    x = Conv2D(128, (3,3), strides=(1,1), padding="same", name="conv_3", use_bias=False)(x)
-    x = BatchNormalization(name="norm3")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 4
-    x = Conv2D(64, (1,1), strides=(1,1), padding="same", name="conv_4", use_bias=False)(x)
-    x = BatchNormalization(name="norm4")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 5
-    x = Conv2D(128, (3,3), strides=(1,1), padding="same", name="conv_5", use_bias=False)(x)
-    x = BatchNormalization(name="norm5")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    x = MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
-    ## Layer 6
-    x = Conv2D(256, (3,3), strides=(1,1), padding="same", name="conv_6", use_bias=False)(x)
-    x = BatchNormalization(name="norm6")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 7
-    x = Conv2D(128, (1,1), strides=(1,1), padding="same", name="conv_7", use_bias=False)(x)
-    x = BatchNormalization(name="norm7")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 8
-    x = Conv2D(256, (3,3), strides=(1,1), padding="same", name="conv_8", use_bias=False)(x)
-    x = BatchNormalization(name="norm8")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    x = MaxPooling2D(pool_size=(2,2))(x)
-    ## Layer 9
-    x = Conv2D(512, (3,3), strides=(1,1), padding="same", name="conv_9", use_bias=False)(x)
-    x = BatchNormalization(name="norm9")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 10
-    x = Conv2D(256, (1,1), strides=(1,1), padding="same", name="conv_10", use_bias=False)(x)
-    x = BatchNormalization(name="norm10")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 11
-    x = Conv2D(512, (3,3), strides=(1,1), padding="same", name="conv_11", use_bias=False)(x)
-    x = BatchNormalization(name="norm11")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 12
-    x = Conv2D(256, (1,1), strides=(1,1), padding="same", name="conv_12", use_bias=False)(x)
-    x = BatchNormalization(name="norm12")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 13
-    x = Conv2D(512, (3,3), strides=(1,1), padding="same", name="conv_13", use_bias=False)(x)
-    x = BatchNormalization(name="norm13")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-
-    skip_connection = x
-    x = MaxPooling2D(pool_size=(2,2), strides=(2,2))(x)
-
-    ## Layer 14
-    x = Conv2D(1024, (3,3), strides=(1,1), padding="same", name="conv_14", use_bias=False)(x)
-    x = BatchNormalization(name="norm14")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 15
-    x = Conv2D(512, (1,1), strides=(1,1), padding="same", name="conv_15", use_bias=False)(x)
-    x = BatchNormalization(name="norm15")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 16
-    x = Conv2D(1024, (3,3), strides=(1,1), padding="same", name="conv_16", use_bias=False)(x)
-    x = BatchNormalization(name="norm16")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 17
-    x = Conv2D(512, (1,1), strides=(1,1), padding="same", name="conv_17", use_bias=False)(x)
-    x = BatchNormalization(name="norm17")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 18
-    x = Conv2D(1024, (3,3), strides=(1,1), padding="same", name="conv_18", use_bias=False)(x)
-    x = BatchNormalization(name="norm18")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 19
-    x = Conv2D(1024, (3,3), strides=(1,1), padding="same", name="conv_19", use_bias=False)(x)
-    x = BatchNormalization(name="norm19")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    ## Layer 20
-    x = Conv2D(1024, (3,3), strides=(1,1), padding="same", name="conv_20", use_bias=False)(x)
-    x = BatchNormalization(name="norm20")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    # Layer 21
-    skip_connection = Conv2D(64, (1,1), strides=(1,1), padding="same", name="conv_21", use_bias=False)(skip_connection)
-    skip_connection = BatchNormalization(name="norm21")(skip_connection)
-    skip_connection = LeakyReLu(alpha=0.1)(skip_connection)
-
-    skip_connection = SpaceToDepth(block_size=2)(skip_connection)
-    x = concatenate([skip_connection, x])
-    ##Layer 22
-    x = Conv2D(1024, (3,3), strides=(1,1), padding="same", name="conv_22", use_bias=False)(x)
-    x = BatchNormalization(name="norm22")(x)
-    x = LeakyReLu(alpha=0.1)(x)
-    x = Dropout(0.5)(x)
-    ##Layer 23
-    x = Conv2D(mc.BOX * (4 + 1 + mc.CLASSES), (1,1), strides=(1,1), padding="same", name="conv_23")(x)
-    output = Reshape((mc.GRID_W, mc.GRID_H, mc.BOX, 4 + 1 + mc.CLASSES))(x)
-
-    model = keras.models.Model(input_image, output)
-    return model
-
-model = make_model()
 print(model.summary())
 
 ### TRAINING THE YOLOv2 MODEL
