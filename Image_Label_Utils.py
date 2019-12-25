@@ -1,11 +1,8 @@
 import os, cv2
 import shutil, tqdm
-from config import *
 from PIL import Image
 
-mc = build_config()
-
-def image_bbox_resize_ops(RAWDATA):
+def image_bbox_resize_ops(config, RAWDATA):
     main_folder = os.path.dirname(RAWDATA)
     
     ### following three folders correspond to the contents of "OID" inside the main project directory
@@ -20,8 +17,8 @@ def image_bbox_resize_ops(RAWDATA):
     foldername = foldername[0]
 
     ### Create the folder structure
-    store_train_folder = os.path.join(mc.maindir, "Dataset", mc.PROJECT, "TRAIN")
-    store_test_folder = os.path.join(mc.maindir, "Dataset", mc.PROJECT, "TEST")
+    store_train_folder = os.path.join(config.maindir, "Dataset", config.PROJECT, "TRAIN")
+    store_test_folder = os.path.join(config.maindir, "Dataset", config.PROJECT, "TEST")
     os.makedirs(store_train_folder, exist_ok=True)
     os.makedirs(store_test_folder, exist_ok=True)
 
@@ -45,9 +42,9 @@ def image_bbox_resize_ops(RAWDATA):
             filename = images[i].split(".")[0]
             img = Image.open(os.path.join(orig_folder, images[i]))
             ## Note that img.size returns width and height. PIL returns an RGB Image object
-            resize_ratio_x, resize_ratio_y = mc.IMAGE_W/img.size[0], mc.IMAGE_H/img.size[1]
+            resize_ratio_x, resize_ratio_y = config.IMAGE_W/img.size[0], config.IMAGE_H/img.size[1]
             ### resize the Image (image object) and save to disk
-            img = img.resize((mc.IMAGE_W, mc.IMAGE_H), resample=Image.LANCZOS)
+            img = img.resize((config.IMAGE_W, config.IMAGE_H), resample=Image.LANCZOS)
             img.save(os.path.join(store_image_folder, filename + ".jpg"), format="JPEG")
 
             with open(os.path.join(orig_folder, "Label", filename + ".txt"), 'r') as f:

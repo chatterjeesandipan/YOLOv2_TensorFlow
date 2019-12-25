@@ -1,26 +1,26 @@
 import warnings
 warnings.filterwarnings("ignore")
 
+import warnings 
+warnings.filterwarnings("ignore")
+
 import os, sys
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 K = keras.backend
 
-from config import *
-mc = build_config()
-
-def process_true_boxes(true_boxes):
+def process_true_boxes(config, true_boxes):
     """
     Build image ground truth in YOLO format from the true boxes and anchors
     """
-    scale = mc.IMAGE_W / mc.GRID_W
-    anchor_count = len(mc.ANCHORS) // 2
-    anchors = np.array(mc.ANCHORS)
+    scale = config.IMAGE_W / config.GRID_W
+    anchor_count = len(config.ANCHORS) // 2
+    anchors = np.array(config.ANCHORS)
     anchors = anchors.reshape(len(anchors)//2, 2)
 
-    detector_mask = np.zeros((mc.GRID_W, mc.GRID_H, anchor_count, 1))
-    match_true_boxes = np.zeros((mc.GRID_W, mc.GRID_H, anchor_count, 5))
+    detector_mask = np.zeros((config.GRID_W, config.GRID_H, anchor_count, 1))
+    match_true_boxes = np.zeros((config.GRID_W, config.GRID_H, anchor_count, 5))
 
     ### convert true boxes numpy array to Tensor
     true_boxes = true_boxes.numpy()
@@ -50,10 +50,11 @@ def process_true_boxes(true_boxes):
                 detector_mask[y_coord, x_coord, best_anchor] = 1
                 yolo_box = np.array([x, y, w, h, box[4]])
                 match_true_boxes[y_coord, x_coord, best_anchor] = yolo_box
+
     return match_true_boxes, detector_mask, true_boxes_grid
 
 
-def ground_truth_generator(dataset, labels_dict):
+def ground_truth_generator(config, dataset, labels_dict):
     """
     convert the true bounding box data to YOLO format; for use with 
     predictions in loss functions
@@ -67,7 +68,7 @@ def ground_truth_generator(dataset, labels_dict):
 
         for i in range(true_boxes.shape[0]):
             one_match_true_boxes, one_detector_mask, true_boxes_grid = \
-                process_true_boxes(true_boxes[i])
+                process_true_boxes(config, true_boxes[i])
 
             batch_matching_true_boxes.append(one_match_true_boxes)
             batch_detector_mask.append(one_detector_mask)

@@ -6,8 +6,6 @@ import tensorflow as tf
 import numpy as np
 import tqdm
 
-from config import *
-mc = build_config()
 
 def image_label_pairs(image_dir, label_dir, name):
     images = [file.split(".")[0] for file in os.listdir(image_dir) if file.endswith(".jpg")]

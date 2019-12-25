@@ -4,10 +4,8 @@ import numpy as np
 import imgaug as ia
 import imgaug.augmenters as iaa
 
-from config import *
-mc = build_config()
 
-def augment_dataset(dataset):
+def augment_dataset(config, dataset):
     for batch in dataset:
         img, boxes = batch[0].numpy(), batch[1].numpy()
         batch_size, width, height, channels = img.shape
@@ -16,7 +14,7 @@ def augment_dataset(dataset):
         for i in range(batch_size):
             ia_box = [ia.BoundingBox(bb[0], bb[1], bb[2], bb[3]) for \
                 bb in boxes[i] if sum(bb[:4]) > 0]
-            ia_boxes.append(ia.BoundingBoxesOnImage(ia_box, shape=(mc.IMAGE_W, mc.IMAGE_H)))
+            ia_boxes.append(ia.BoundingBoxesOnImage(ia_box, shape=(config.IMAGE_W, config.IMAGE_H)))
 
         ## Initiate the data augmentation
         seq = iaa.Sequential([

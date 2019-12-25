@@ -5,14 +5,12 @@ import os, sys, datetime
 import tensorflow as tf
 from tensorflow import keras
 
-from config import *
-mc = build_config()
 from Loss_function import *
 
-def grad(model, img, detector_mask, match_true_boxes, class_one_hot, true_boxes, training=True):
+def grad(model, config, img, detector_mask, match_true_boxes, class_one_hot, true_boxes, training=True):
     with tf.GradientTape() as tape:
         y_pred = model(img, training)
-        loss, sub_loss = yolov2_loss(detector_mask, match_true_boxes, class_one_hot, true_boxes, y_pred)
+        loss, sub_loss = yolov2_loss(config, detector_mask, match_true_boxes, class_one_hot, true_boxes, y_pred)
 
     return loss, sub_loss, tape.gradient(loss, model.trainable_variables)
 
@@ -26,11 +24,11 @@ def save_best_weights(model, log_dir, val_loss_avg):
 #     tf.summary.scalar("val_loss", val_loss, step)
 
 
-def train_fn(model, train_dataset, val_dataset, train_dir, val_dir, train_logname, log_dir):
+def train_fn(model, config, train_dataset, val_dataset, train_dir, val_dir, train_logname, log_dir):
     train_files = [file for file in os.listdir(os.path.join(train_dir, "Images")) if file.endswith(".jpg")]
     val_files = [file for file in os.listdir(os.path.join(val_dir, "Images")) if file.endswith(".jpg")]
-    steps_per_epoch_train = 500 ##len(train_files)//mc.TRAIN_BATCH_SIZE
-    steps_per_epoch_val = 100 ##len(val_files)//mc.VAL_BATCH_SIZE
+    steps_per_epoch_train = len(train_files)//config.TRAIN_BATCH_SIZE
+    steps_per_epoch_val = len(val_files)//config.VAL_BATCH_SIZE
 
     train_loss_history = []
     val_loss_history = []
@@ -43,22 +41,21 @@ def train_fn(model, train_dataset, val_dataset, train_dir, val_dir, train_lognam
     summary_writer.set_as_default()
 
     ### TRAINING
-    for epoch in range(mc.EPOCHS):
+    for epoch in range(config.EPOCHS):
         start_time = datetime.datetime.now()
         epoch_loss, epoch_sub_loss, epoch_val_loss, epoch_val_sub_loss = [], [], [], []
         for batch_idx in range(steps_per_epoch_train):
             img, detector_mask, match_true_boxes, class_one_hot, true_boxes = next(train_dataset)
-            loss, sub_loss, grads = grad(model, img, detector_mask, match_true_boxes, class_one_hot, true_boxes)
+            loss, sub_loss, grads = grad(model, config, img, detector_mask, match_true_boxes, class_one_hot, true_boxes)
 
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
             epoch_loss.append(loss)
             epoch_sub_loss.append(sub_loss)
-            # print("-", end='')
-        # print(" | ", end='')
+
 
         for batch_idx in range(steps_per_epoch_val):
             img, detector_mask, match_true_boxes, class_one_hot, true_boxes = next(val_dataset)
-            loss, sub_loss, grads = grad(model, img, detector_mask, match_true_boxes, class_one_hot, true_boxes, training=False)
+            loss, sub_loss, grads = grad(model, config, img, detector_mask, match_true_boxes, class_one_hot, true_boxes, training=False)
             epoch_val_loss.append(loss)
             epoch_val_sub_loss.append(sub_loss)
 

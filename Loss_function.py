@@ -7,8 +7,6 @@ import tensorflow as tf
 from tensorflow import keras
 K = keras.backend
 
-from config import *
-mc = build_config()
 
 def iou(x1, y1, w1, h1, x2, y2, w2, h2):
     xmin1, ymin1 = x1 - 0.5*w1, y1 - 0.5*h1
@@ -24,29 +22,28 @@ def iou(x1, y1, w1, h1, x2, y2, w2, h2):
     return iou
 
 
-def yolov2_loss(detector_mask, match_true_boxes, class_one_hot, true_boxes_grid, y_pred, info=False):
+def yolov2_loss(config, detector_mask, match_true_boxes, class_one_hot, true_boxes_grid, y_pred, info=False):
     """
     Calculate YOLO v2 Loss from prediction (y_pred) and ground truth tensors
     Get the output as overall loss value
     Also get the loss in each sub-category: confidence, class, boxes
     """
     ### Anchors
-    anchors = np.array(mc.ANCHORS)
+    anchors = np.array(config.ANCHORS)
     anchors = anchors.reshape(len(anchors)//2, 2)
     ### Grid Coords Tensor
-    coord_x = tf.cast(tf.reshape(tf.tile(tf.range(mc.GRID_W), [mc.GRID_H]), \
-        (1, mc.GRID_H, mc.GRID_W, 1, 1)), tf.float32)
+    coord_x = tf.cast(tf.reshape(tf.tile(tf.range(config.GRID_W), [config.GRID_H]), \
+        (1, config.GRID_H, config.GRID_W, 1, 1)), tf.float32)
     coord_y = tf.transpose(coord_x, (0, 2, 1, 3, 4))
     coords = tf.tile(tf.concat([coord_x, coord_y], -1), [y_pred.shape[0], 1, 1, 5, 1])
-
 
     ## BOUNDING BOX LOSS
     pred_xy = K.sigmoid(y_pred[:,:,:,:,0:2])
     pred_xy = (pred_xy + coords)
     pred_wh = K.exp(y_pred[:,:,:,:,2:4]) * anchors
     nb_detector_mask = K.sum(tf.cast(detector_mask > 0.0, tf.float32))
-    xy_loss = mc.LAMBDA_COORD * K.sum(detector_mask * K.square(match_true_boxes[...,:2] - pred_xy))/(nb_detector_mask + 1e-6)
-    wh_loss = mc.LAMBDA_COORD * K.sum(detector_mask * K.square(match_true_boxes[...,2:4] - K.sqrt(pred_wh)))/(nb_detector_mask + 1e-6)
+    xy_loss = config.LAMBDA_COORD * K.sum(detector_mask * K.square(match_true_boxes[...,:2] - pred_xy))/(nb_detector_mask + 1e-6)
+    wh_loss = config.LAMBDA_COORD * K.sum(detector_mask * K.square(match_true_boxes[...,2:4] - K.sqrt(pred_wh)))/(nb_detector_mask + 1e-6)
     coord_loss = xy_loss + wh_loss 
 
     ## CLASS LOSS
@@ -54,7 +51,7 @@ def yolov2_loss(detector_mask, match_true_boxes, class_one_hot, true_boxes_grid,
     true_box_class = tf.argmax(class_one_hot, -1)
     class_loss = K.sparse_categorical_crossentropy(target=true_box_class, output=pred_box_class, from_logits=True)
     class_loss = K.expand_dims(class_loss, -1) * detector_mask
-    class_loss = mc.LAMBDA_CLASS * K.sum(class_loss) / (nb_detector_mask + 1e-6)
+    class_loss = config.LAMBDA_CLASS * K.sum(class_loss) / (nb_detector_mask + 1e-6)
 
     ## CONFIDENCE LOSS
     pred_conf = K.sigmoid(y_pred[..., 4:5])
@@ -94,9 +91,9 @@ def yolov2_loss(detector_mask, match_true_boxes, class_one_hot, true_boxes_grid,
     no_object_detection = K.cast(best_ious < 0.6, K.dtype(best_ious))
     noobj_mask = no_object_detection * (1 - detector_mask)
     nb_noobj_mask = K.sum(tf.cast(noobj_mask > 0.0, tf.float32))
-    noobject_loss = mc.LAMBDA_NOOBJECT * K.sum(noobj_mask*K.square(-pred_conf)) / (nb_noobj_mask + 1e-6)
+    noobject_loss = config.LAMBDA_NOOBJECT * K.sum(noobj_mask*K.square(-pred_conf)) / (nb_noobj_mask + 1e-6)
     ## object confidence loss
-    object_loss = mc.LAMBDA_OBJECT * K.sum(detector_mask * K.square(ious - pred_conf)) / (nb_detector_mask + 1e-6)
+    object_loss = config.LAMBDA_OBJECT * K.sum(detector_mask * K.square(ious - pred_conf)) / (nb_detector_mask + 1e-6)
     ## total confidence loss
     conf_loss = noobject_loss + object_loss
 
