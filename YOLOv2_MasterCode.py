@@ -24,9 +24,6 @@ from Loss_function import *
 from Create_Model import *
 from Train_Function import *
 
-### Define leakyReLu layer for Convolutions
-LeakyReLu = keras.layers.LeakyReLU
-K = keras.backend
 
 ### Bring in the model configuration file
 mc = build_config()
@@ -68,6 +65,8 @@ parser.add_argument("--learning_rate", required=False, default=1e-4, type=float,
     help='Initial learning rate for model training')
 parser.add_argument("--model", required=False, default="YOLO", type=str, \
     help='Choose the object detection model type')
+parser.add_argument("--resize_data", required=False, default="yes", type=str, \
+    help='Resize image and bounding box data (yes/no), if data being reused')
 
 args = parser.parse_args()
 mc.PROJECT, mc.MODEL = args.project_name, args.model.upper()
@@ -84,7 +83,10 @@ rawdata_dir = os.path.join(os.getcwd(), "OID")
 
 ### Creating the dataset for training and testing
 ### comment the line below if you have previously resized the training data
-image_bbox_resize_ops(mc, rawdata_dir)
+if args.resize_data in ("y", "yes", "Yes", "YES", "1"):
+    image_bbox_resize_ops(mc, rawdata_dir)
+else:
+    pass
 
 ### Paths of Training and Testing images' and labels' folders
 train_folder = os.path.abspath(os.path.join(mc.maindir, "Dataset", mc.PROJECT, "TRAIN"))

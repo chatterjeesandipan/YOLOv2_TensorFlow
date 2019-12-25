@@ -3,6 +3,9 @@ from tensorflow import keras
 K = keras.backend
 from tensorflow.keras.layers import *
 
+### Define leakyReLu layer for Convolutions
+LeakyReLu = keras.layers.LeakyReLU
+
 class SpaceToDepth(keras.layers.Layer):
 
     def __init__(self, block_size, **kwargs):

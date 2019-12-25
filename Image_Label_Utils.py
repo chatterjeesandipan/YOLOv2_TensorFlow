@@ -38,7 +38,6 @@ def image_bbox_resize_ops(config, RAWDATA):
 
         orig_folder = os.path.join(eval(task + "_folder"), foldername)
         images = [f for f in os.listdir(orig_folder) if f.endswith(".jpg")]
-        print(len(images))
         for i in tqdm.tqdm(range(len(images)), total=len(images), desc="Resizing {} images and boxes".format(task.upper())):
             filename = images[i].split(".")[0]
             img = Image.open(os.path.join(orig_folder, images[i]))
