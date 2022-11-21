@@ -54,7 +54,7 @@ Shapely==1.6.4.post2
 six==1.13.0
 tensorboard==2.0.2
 tensorflow-estimator==2.0.1
-tensorflow-gpu==2.0.1
+tensorflow-gpu==2.9.3
 termcolor==1.1.0
 tqdm==4.40.2
 urllib3==1.25.7
